@@ -77,3 +77,22 @@ def test_match_employee_with_scope_filters(client):
 def test_match_requires_token(client):
     r = client.post("/v1/match", json={"query": "x", "entity_type": "company", "customer_id": "x"})
     assert r.status_code == 401
+
+
+def test_candidates_override_skips_db(client):
+    # No respx stubs registered — if the loader is called, this would fail.
+    r = client.post(
+        "/v1/match",
+        headers={"X-Internal-Token": "secret"},
+        json={
+            "query": "Waysis",
+            "entity_type": "company",
+            "customer_id": "any",
+            "candidates": [
+                {"id": "c1", "display_name": "Waysis", "canonical_name": "waysis"},
+                {"id": "c2", "display_name": "Wasteless", "canonical_name": "wasteless"},
+            ],
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["matches"][0]["id"] == "c1"
