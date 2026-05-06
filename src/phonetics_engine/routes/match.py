@@ -1,3 +1,4 @@
+import logging
 from functools import lru_cache
 
 from fastapi import APIRouter, Request
@@ -5,15 +6,17 @@ from fastapi import APIRouter, Request
 from phonetics_engine.auth import require_internal_token
 from phonetics_engine.config import Settings
 from phonetics_engine.decision import classify
-from phonetics_engine.enums import EntityType, MatchField
+from phonetics_engine.enums import Decision, EntityType, MatchField
 from phonetics_engine.index_cache import IndexCache
-from phonetics_engine.loader import fetch_companies, fetch_employees
+from phonetics_engine.loader import CompanyRecord, EmployeeRecord, fetch_companies, fetch_employees
 from phonetics_engine.matcher import (
     TenantIndex,
     build_company_index,
     build_employee_index,
 )
-from phonetics_engine.models import MatchRequest, MatchResponse, Thresholds
+from phonetics_engine.models import CompanyCandidate, EmployeeCandidate, MatchRequest, MatchResponse, Thresholds
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -77,20 +80,68 @@ def _cache_key(req: MatchRequest) -> tuple:
     return (req.customer_id, "employee", cid, tuple(_resolve_fields(req)))
 
 
+def _search_candidates_override(req: MatchRequest, s: Settings):
+    fields = _resolve_fields(req)
+    if req.entity_type == EntityType.COMPANY:
+        records = [
+            CompanyRecord(
+                id=c.id,
+                display_name=c.display_name,
+                canonical_name=c.canonical_name,
+                aliases=c.aliases,
+            )
+            for c in req.candidates or []
+            if isinstance(c, CompanyCandidate)
+        ]
+        index = build_company_index(records, match_fields=fields)
+    else:
+        records = [
+            EmployeeRecord(
+                id=c.id,
+                first_name=c.first_name,
+                infix=c.infix,
+                last_name=c.last_name,
+                full_name=c.full_name,
+                company_ids=[],
+            )
+            for c in req.candidates or []
+            if isinstance(c, EmployeeCandidate)
+        ]
+        index = build_employee_index(records, match_fields=fields)
+    return index.search(req.query, top_k=req.top_k)
+
+
 @router.post("/v1/match", response_model=MatchResponse, dependencies=[require_internal_token()])
 async def match(req: MatchRequest, request: Request) -> MatchResponse:
     s = _settings()
     cache: IndexCache = request.app.state.index_cache
     thresholds = _resolve_thresholds(req, s)
 
-    async def builder() -> TenantIndex:
-        if req.entity_type == EntityType.COMPANY:
-            return await _build_company_tenant_index(req, s)
-        return await _build_employee_tenant_index(req, s)
+    try:
+        if req.candidates is not None:
+            scored = _search_candidates_override(req, s)
+        else:
+            async def builder() -> TenantIndex:
+                if req.entity_type == EntityType.COMPANY:
+                    return await _build_company_tenant_index(req, s)
+                return await _build_employee_tenant_index(req, s)
 
-    index = await cache.get_or_build(_cache_key(req), builder)
-    scored = index.search(req.query, top_k=req.top_k)
-    decision, matches = classify(req.query, scored, thresholds, req.top_k)
+            index = await cache.get_or_build(_cache_key(req), builder)
+            scored = index.search(req.query, top_k=req.top_k)
+
+        decision, matches = classify(req.query, scored, thresholds, req.top_k)
+    except Exception:
+        logger.exception(
+            "match_service_error customer_id=%s entity_type=%s",
+            req.customer_id,
+            req.entity_type.value,
+        )
+        return MatchResponse(
+            entity_type=req.entity_type,
+            decision=Decision.SERVICE_ERROR,
+            applied_thresholds=thresholds,
+            matches=[],
+        )
 
     return MatchResponse(
         entity_type=req.entity_type,
