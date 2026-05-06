@@ -7,7 +7,7 @@ from phonetics_engine.config import Settings
 from phonetics_engine.index_cache import IndexCache
 from phonetics_engine.logging_setup import configure_logging
 from phonetics_engine.prewarm import prewarm_all
-from phonetics_engine.routes import health, match
+from phonetics_engine.routes import health, legacy, match
 from phonetics_engine.routes import metrics as metrics_route
 from phonetics_engine.routes import reload as reload_route
 
@@ -34,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(match.router)
     app.include_router(reload_route.router)
     app.include_router(metrics_route.router)
+    app.include_router(legacy.router)
     return app
 
 
