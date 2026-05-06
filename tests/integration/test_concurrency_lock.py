@@ -7,7 +7,6 @@ import respx
 
 from phonetics_engine.main import create_app
 
-
 pytestmark = pytest.mark.skipif(
     pytest.importorskip("phonemizer", reason="espeak-ng not available") is None,
     reason="espeak-ng not installed",
@@ -42,7 +41,8 @@ async def test_parallel_misses_call_supabase_once(app):
 
     respx.get("https://test.supabase.co/rest/v1/companies").mock(side_effect=handler)
 
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as client:
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://t") as client:
         results = await asyncio.gather(*(
             client.post(
                 "/v1/match",

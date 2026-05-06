@@ -14,7 +14,13 @@ from phonetics_engine.matcher import (
     build_company_index,
     build_employee_index,
 )
-from phonetics_engine.models import CompanyCandidate, EmployeeCandidate, MatchRequest, MatchResponse, Thresholds
+from phonetics_engine.models import (
+    CompanyCandidate,
+    EmployeeCandidate,
+    MatchRequest,
+    MatchResponse,
+    Thresholds,
+)
 
 logger = logging.getLogger(__name__)
 

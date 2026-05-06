@@ -5,7 +5,6 @@ from fastapi.testclient import TestClient
 
 from phonetics_engine.main import create_app
 
-
 pytestmark = pytest.mark.skipif(
     pytest.importorskip("phonemizer", reason="espeak-ng not available") is None,
     reason="espeak-ng not installed",
