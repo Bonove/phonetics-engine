@@ -5,7 +5,7 @@ from phonetics_engine.models import Match, Thresholds
 from phonetics_engine.normalize import canonicalize
 
 
-@dataclass
+@dataclass(slots=True)
 class ScoredCandidate:
     id: str
     display_name: str
@@ -37,6 +37,8 @@ def classify(
     thresholds: Thresholds,
     top_k: int,
 ) -> tuple[Decision, list[Match]]:
+    if top_k < 1:
+        raise ValueError(f"top_k must be >= 1, got {top_k}")
     if not scored:
         return Decision.NO_MATCH, []
 
@@ -45,11 +47,13 @@ def classify(
 
     exact_matches = [c for c in scored if _is_exact(query_canon, c)]
     if len(exact_matches) == 1:
+        # single exact match: margin_to_next = score (no runner-up to subtract)
         return Decision.EXACT, [_to_match(exact_matches[0], exact_matches[0].score)]
     if len(exact_matches) >= 2:
         kept = exact_matches[:top_k]
         out = []
         for i, c in enumerate(kept):
+            # last element: margin_to_next = full score (no runner-up exists)
             margin = c.score - kept[i + 1].score if i + 1 < len(kept) else c.score
             out.append(_to_match(c, margin))
         return Decision.AMBIGUOUS, out
@@ -59,13 +63,14 @@ def classify(
         return Decision.NO_MATCH, []
 
     runner_up_score = scored[1].score if len(scored) > 1 else 0.0
-    margin = best.score - runner_up_score
+    margin = round(best.score - runner_up_score, 4)
 
     if margin < thresholds.ambiguity_margin:
         kept = [c for c in scored[:top_k] if c.score >= thresholds.min_match
-                and (best.score - c.score) < thresholds.ambiguity_margin]
+                and round(best.score - c.score, 4) < thresholds.ambiguity_margin]
         out = []
         for i, c in enumerate(kept):
+            # last element: margin_to_next = full score (no runner-up exists)
             m = c.score - kept[i + 1].score if i + 1 < len(kept) else c.score
             out.append(_to_match(c, m))
         return Decision.AMBIGUOUS, out

@@ -6,4 +6,4 @@ def canonicalize(s: str) -> str:
         return ""
     decomposed = unicodedata.normalize("NFKD", s)
     stripped = "".join(c for c in decomposed if not unicodedata.combining(c))
-    return stripped.lower().strip()
+    return " ".join(stripped.lower().split())

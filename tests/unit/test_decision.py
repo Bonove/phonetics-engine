@@ -114,3 +114,18 @@ def test_margin_to_next_for_last_match():
     )
     assert decision == Decision.SINGLE_HIGH_CONFIDENCE
     assert round(matches[0].margin_to_next, 4) == 0.45
+
+
+def test_no_match_mid_confidence_wide_margin():
+    """best.score in [min_match, high_confidence) with wide margin → still NO_MATCH per spec."""
+    decision, matches = classify(
+        query="xxxxxx",
+        scored=[
+            _sc("c1", "Aardvark", "aardvark", 0.70),
+            _sc("c2", "Beetle", "beetle", 0.20),
+        ],
+        thresholds=COMPANY_THRESHOLDS,
+        top_k=5,
+    )
+    assert decision == Decision.NO_MATCH
+    assert matches == []
