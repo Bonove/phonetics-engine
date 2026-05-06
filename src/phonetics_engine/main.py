@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from phonetics_engine.config import Settings
 from phonetics_engine.index_cache import IndexCache
 from phonetics_engine.routes import health, match
+from phonetics_engine.routes import reload as reload_route
 
 
 def create_app() -> FastAPI:
@@ -12,6 +13,7 @@ def create_app() -> FastAPI:
     app.state.index_cache = IndexCache(ttl_seconds=float(settings.phx_cache_ttl_seconds))
     app.include_router(health.router)
     app.include_router(match.router)
+    app.include_router(reload_route.router)
     return app
 
 
