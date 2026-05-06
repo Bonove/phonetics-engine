@@ -1,4 +1,5 @@
 import logging
+import time
 from functools import lru_cache
 
 from fastapi import APIRouter, Request
@@ -122,11 +123,18 @@ async def match(req: MatchRequest, request: Request) -> MatchResponse:
     s = _settings()
     cache: IndexCache = request.app.state.index_cache
     thresholds = _resolve_thresholds(req, s)
+    started = time.perf_counter()
+    cache_status = "miss"
 
     try:
         if req.candidates is not None:
             scored = _search_candidates_override(req, s)
+            cache_status = "n/a"
         else:
+            existing = cache._values.get(_cache_key(req))  # noqa: SLF001
+            if existing is not None and existing[0] > time.monotonic():
+                cache_status = "hit"
+
             async def builder() -> TenantIndex:
                 if req.entity_type == EntityType.COMPANY:
                     return await _build_company_tenant_index(req, s)
@@ -139,8 +147,7 @@ async def match(req: MatchRequest, request: Request) -> MatchResponse:
     except Exception:
         logger.exception(
             "match_service_error customer_id=%s entity_type=%s",
-            req.customer_id,
-            req.entity_type.value,
+            req.customer_id, req.entity_type.value,
         )
         return MatchResponse(
             entity_type=req.entity_type,
@@ -148,6 +155,13 @@ async def match(req: MatchRequest, request: Request) -> MatchResponse:
             applied_thresholds=thresholds,
             matches=[],
         )
+
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
+    top_score = matches[0].score if matches else 0.0
+    logger.info(
+        "match customer_id=%s entity_type=%s decision=%s top_score=%.3f cache=%s latency_ms=%d",
+        req.customer_id, req.entity_type.value, decision.value, top_score, cache_status, elapsed_ms,
+    )
 
     return MatchResponse(
         entity_type=req.entity_type,

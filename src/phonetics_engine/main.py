@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from phonetics_engine.config import Settings
 from phonetics_engine.index_cache import IndexCache
+from phonetics_engine.logging_setup import configure_logging
 from phonetics_engine.prewarm import prewarm_all
 from phonetics_engine.routes import health, match
 from phonetics_engine.routes import reload as reload_route
@@ -23,6 +24,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    configure_logging()
     settings = Settings()
     app = FastAPI(title="phonetics-engine", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
