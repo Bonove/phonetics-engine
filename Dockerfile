@@ -15,6 +15,9 @@ RUN pip install --no-cache-dir uv && uv sync --frozen --no-dev
 
 COPY src/ ./src/
 
+RUN adduser --disabled-password --gecos "" appuser
+USER appuser
+
 ENV PATH="/app/.venv/bin:$PATH"
 EXPOSE 8000
 CMD ["uvicorn", "phonetics_engine.main:app", "--host", "0.0.0.0", "--port", "8000"]

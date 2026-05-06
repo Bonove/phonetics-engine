@@ -4,6 +4,7 @@ services:
     runtime: docker
     region: frankfurt
     plan: starter
+    autoDeploy: false
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:
