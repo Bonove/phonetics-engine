@@ -1,7 +1,13 @@
+import espeakng_loader
 import faiss
 import numpy as np
 from phonemizer import phonemize
+from phonemizer.backend.espeak.wrapper import EspeakWrapper
 from phonemizer.separator import Separator
+
+# Bundle espeak-ng via pip wheel so we don't depend on apt/brew system installs.
+EspeakWrapper.set_library(espeakng_loader.get_library_path())
+EspeakWrapper.set_data_path(espeakng_loader.get_data_path())
 
 PHONEMIZER_LANGUAGE = "nl"
 PHONEMIZER_BACKEND = "espeak"

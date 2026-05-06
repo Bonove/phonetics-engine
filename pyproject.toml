@@ -11,7 +11,8 @@ dependencies = [
   "httpx>=0.27",
   "numpy>=1.26",
   "faiss-cpu>=1.8",
-  "phonemizer>=3.3",
+  "phonemizer-fork>=3.3.2",
+  "espeakng-loader>=0.2.4",
   "prometheus-client>=0.20",
 ]
 
