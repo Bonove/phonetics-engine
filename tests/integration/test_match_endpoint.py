@@ -96,3 +96,9 @@ def test_candidates_override_skips_db(client):
     )
     assert r.status_code == 200
     assert r.json()["matches"][0]["id"] == "c1"
+
+
+def test_metrics_endpoint_exposes_counters(client):
+    r = client.get("/metrics")
+    assert r.status_code == 200
+    assert "phx_match_requests_total" in r.text

@@ -15,6 +15,7 @@ from phonetics_engine.matcher import (
     build_company_index,
     build_employee_index,
 )
+from phonetics_engine.metrics import INDEX_BUILD, LATENCY, REQUESTS, SERVICE_ERRORS
 from phonetics_engine.models import (
     CompanyCandidate,
     EmployeeCandidate,
@@ -136,9 +137,15 @@ async def match(req: MatchRequest, request: Request) -> MatchResponse:
                 cache_status = "hit"
 
             async def builder() -> TenantIndex:
+                t0 = time.perf_counter()
                 if req.entity_type == EntityType.COMPANY:
-                    return await _build_company_tenant_index(req, s)
-                return await _build_employee_tenant_index(req, s)
+                    idx = await _build_company_tenant_index(req, s)
+                else:
+                    idx = await _build_employee_tenant_index(req, s)
+                INDEX_BUILD.labels(req.customer_id, req.entity_type.value).observe(
+                    time.perf_counter() - t0
+                )
+                return idx
 
             index = await cache.get_or_build(_cache_key(req), builder)
             scored = index.search(req.query, top_k=req.top_k)
@@ -149,6 +156,7 @@ async def match(req: MatchRequest, request: Request) -> MatchResponse:
             "match_service_error customer_id=%s entity_type=%s",
             req.customer_id, req.entity_type.value,
         )
+        SERVICE_ERRORS.labels("unhandled").inc()
         return MatchResponse(
             entity_type=req.entity_type,
             decision=Decision.SERVICE_ERROR,
@@ -162,6 +170,8 @@ async def match(req: MatchRequest, request: Request) -> MatchResponse:
         "match customer_id=%s entity_type=%s decision=%s top_score=%.3f cache=%s latency_ms=%d",
         req.customer_id, req.entity_type.value, decision.value, top_score, cache_status, elapsed_ms,
     )
+    REQUESTS.labels(req.customer_id, req.entity_type.value, decision.value).inc()
+    LATENCY.labels(req.customer_id, req.entity_type.value, "total").observe(elapsed_ms / 1000.0)
 
     return MatchResponse(
         entity_type=req.entity_type,
