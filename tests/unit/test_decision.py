@@ -1,7 +1,6 @@
-from phonetics_engine.enums import Decision, MatchField
 from phonetics_engine.decision import ScoredCandidate, classify
+from phonetics_engine.enums import Decision, MatchField
 from phonetics_engine.models import Thresholds
-
 
 COMPANY_THRESHOLDS = Thresholds(min_match=0.55, high_confidence=0.82, ambiguity_margin=0.10)
 
@@ -91,7 +90,7 @@ def test_ambiguous_close_scores():
 
 
 def test_top_k_truncates_ambiguous_matches():
-    """All 10 candidates are within ambiguity_margin of the best — top_k should clip the returned list."""
+    """All 10 candidates are within ambiguity_margin of the best — top_k clips the returned list."""
     scored = [_sc(f"c{i}", f"Co{i}", f"co{i}", 0.90 - i * 0.01) for i in range(10)]
     decision, matches = classify(
         query="xxxxx",
