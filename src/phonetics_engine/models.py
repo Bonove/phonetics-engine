@@ -65,10 +65,12 @@ class MatchRequest(BaseModel):
     def _query_non_empty(cls, v: str) -> str:
         if not v or not v.strip():
             raise ValueError("query must be non-empty")
-        return v
+        return v.strip()
 
 
 class Match(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     id: str
     display_name: str
     canonical_name: str
@@ -79,6 +81,8 @@ class Match(BaseModel):
 
 
 class MatchResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     entity_type: EntityType
     decision: Decision
     applied_thresholds: Thresholds

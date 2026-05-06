@@ -71,6 +71,11 @@ def test_employee_candidate_with_infix():
     assert c.full_name == "Sanne de Vries"
 
 
+def test_employee_candidate_whitespace_only_infix():
+    c = EmployeeCandidate(id="e1", first_name="Sanne", infix="   ", last_name="Vries")
+    assert c.full_name == "Sanne Vries"
+
+
 def test_match_request_company_minimal():
     r = MatchRequest(
         query="wasteless",
@@ -100,18 +105,21 @@ def test_match_request_rejects_unknown_entity_type():
         MatchRequest(query="x", entity_type="vehicle", customer_id="x")
 
 
-def test_match_response_no_phone_in_match():
-    m = Match(
-        id="e1",
-        display_name="Sanne de Vries",
-        canonical_name="sanne de vries",
-        score=0.78,
-        margin_to_next=0.04,
-        matched_field=MatchField.LAST_NAME,
-        matched_value="de Vries",
-    )
-    dumped = m.model_dump()
-    assert "phone" not in dumped
+def test_match_request_strips_query_whitespace():
+    r = MatchRequest(query="  wasteless  ", entity_type=EntityType.COMPANY, customer_id="x")
+    assert r.query == "wasteless"
+
+
+def test_match_rejects_phone_field():
+    with pytest.raises(ValidationError):
+        Match(
+            id="e1",
+            display_name="Sanne de Vries",
+            canonical_name="sanne de vries",
+            score=0.78,
+            margin_to_next=0.04,
+            phone="31600000000",
+        )
 
 
 def test_match_response_serializes():
