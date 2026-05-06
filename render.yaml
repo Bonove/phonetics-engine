@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: phonetics-engine
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: PHX_INTERNAL_TOKEN
+        sync: false
+      - key: PHX_COMPANY_MIN_MATCH
+        value: "0.55"
+      - key: PHX_COMPANY_HIGH_CONFIDENCE
+        value: "0.82"
+      - key: PHX_COMPANY_AMBIGUITY_MARGIN
+        value: "0.10"
+      - key: PHX_EMPLOYEE_MIN_MATCH
+        value: "0.55"
+      - key: PHX_EMPLOYEE_HIGH_CONFIDENCE
+        value: "0.86"
+      - key: PHX_EMPLOYEE_AMBIGUITY_MARGIN
+        value: "0.12"
+      - key: PHX_CACHE_TTL_SECONDS
+        value: "60"
+      - key: PHX_TOP_K_DEFAULT
+        value: "5"
+      - key: PHX_LOG_PAYLOAD
+        value: "0"
+      - key: PHX_PREWARM_ENABLED
+        value: "1"
