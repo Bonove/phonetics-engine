@@ -20,7 +20,7 @@ class EmployeeRecord:
     infix: str | None
     last_name: str
     full_name: str
-    company_ids: list[str]
+    company_id: str | None = None
 
 
 def _headers(settings: Settings) -> dict[str, str]:
@@ -58,28 +58,30 @@ async def fetch_employees(
     company_id: str | None = None,
 ) -> list[EmployeeRecord]:
     url = f"{settings.supabase_url}/rest/v1/employees"
-    params = {
-        "customer_id": f"eq.{customer_id}",
-        "select": "id,first_name,infix,last_name,full_name,employee_company_roles(company_id)",
-    }
+    # Filter on companies.customer_id via embedded resource (PostgREST !inner).
+    params: list[tuple[str, str]] = [
+        (
+            "select",
+            "id,first_name,infix,last_name,full_name,company_id,companies!inner(customer_id)",
+        ),
+        ("companies.customer_id", f"eq.{customer_id}"),
+    ]
+    if company_id is not None:
+        params.append(("company_id", f"eq.{company_id}"))
+
     async with httpx.AsyncClient(timeout=10.0) as client:
         r = await client.get(url, params=params, headers=_headers(settings))
         r.raise_for_status()
         rows = r.json()
 
-    out: list[EmployeeRecord] = []
-    for row in rows:
-        company_ids = [r["company_id"] for r in row.get("employee_company_roles") or []]
-        if company_id is not None and company_id not in company_ids:
-            continue
-        out.append(
-            EmployeeRecord(
-                id=row["id"],
-                first_name=row["first_name"],
-                infix=row.get("infix"),
-                last_name=row["last_name"],
-                full_name=row["full_name"],
-                company_ids=company_ids,
-            )
+    return [
+        EmployeeRecord(
+            id=row["id"],
+            first_name=row["first_name"],
+            infix=row.get("infix"),
+            last_name=row["last_name"],
+            full_name=row["full_name"],
+            company_id=row.get("company_id"),
         )
-    return out
+        for row in rows
+    ]

@@ -28,7 +28,7 @@ def _stub_supabase():
     respx.get("https://test.supabase.co/rest/v1/employees").mock(
         return_value=httpx.Response(200, json=[
             {"id": "e1", "first_name": "Sanne", "infix": "de", "last_name": "Vries",
-             "full_name": "Sanne de Vries", "employee_company_roles": []},
+             "full_name": "Sanne de Vries", "company_id": "c1"},
         ])
     )
 

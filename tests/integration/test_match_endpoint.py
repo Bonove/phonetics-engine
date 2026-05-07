@@ -53,9 +53,9 @@ def test_match_employee_with_scope_filters(client):
     respx.get("https://test.supabase.co/rest/v1/employees").mock(
         return_value=httpx.Response(200, json=[
             {"id": "e1", "first_name": "Sanne", "infix": "de", "last_name": "Vries",
-             "full_name": "Sanne de Vries", "employee_company_roles": [{"company_id": "c1"}]},
+             "full_name": "Sanne de Vries", "company_id": "c1"},
             {"id": "e2", "first_name": "Bert", "infix": None, "last_name": "Jansen",
-             "full_name": "Bert Jansen", "employee_company_roles": [{"company_id": "c2"}]},
+             "full_name": "Bert Jansen", "company_id": "c2"},
         ])
     )
 

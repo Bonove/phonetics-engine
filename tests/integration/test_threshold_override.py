@@ -52,7 +52,7 @@ def test_default_thresholds_use_env_for_employee(client):
     respx.get("https://test.supabase.co/rest/v1/employees").mock(
         return_value=httpx.Response(200, json=[
             {"id": "e1", "first_name": "Sanne", "infix": None, "last_name": "Vries",
-             "full_name": "Sanne Vries", "employee_company_roles": []},
+             "full_name": "Sanne Vries", "company_id": "c1"},
         ])
     )
     r = client.post(

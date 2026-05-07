@@ -22,7 +22,7 @@ def _company(id_, display, canonical, aliases=None):
 def _employee(id_, first, infix, last):
     full = f"{first} {infix + ' ' if infix else ''}{last}".strip()
     return EmployeeRecord(
-        id=id_, first_name=first, infix=infix, last_name=last, full_name=full, company_ids=[]
+        id=id_, first_name=first, infix=infix, last_name=last, full_name=full
     )
 
 

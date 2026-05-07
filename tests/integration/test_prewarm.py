@@ -34,7 +34,7 @@ async def test_prewarm_lists_tenants_and_builds_indexes(settings):
     respx.get("https://test.supabase.co/rest/v1/employees").mock(
         return_value=httpx.Response(200, json=[
             {"id": "e1", "first_name": "A", "infix": None, "last_name": "Z",
-             "full_name": "A Z", "employee_company_roles": []},
+             "full_name": "A Z", "company_id": "c1"},
         ])
     )
 

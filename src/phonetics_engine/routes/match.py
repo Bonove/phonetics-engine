@@ -110,7 +110,6 @@ def _search_candidates_override(req: MatchRequest, s: Settings):
                 infix=c.infix,
                 last_name=c.last_name,
                 full_name=c.full_name,
-                company_ids=[],
             )
             for c in req.candidates or []
             if isinstance(c, EmployeeCandidate)

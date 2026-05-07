@@ -44,28 +44,34 @@ async def test_fetch_companies_returns_records(settings):
 
 @respx.mock
 @pytest.mark.asyncio
-async def test_fetch_employees_joins_roles(settings):
-    respx.get(
-        "https://test.supabase.co/rest/v1/employees",
-        params={
-            "customer_id": "eq.1000435",
-            "select": "id,first_name,infix,last_name,full_name,employee_company_roles(company_id)",
-        },
-    ).mock(return_value=httpx.Response(200, json=[
-        {
-            "id": "e1",
-            "first_name": "Sanne",
-            "infix": "de",
-            "last_name": "Vries",
-            "full_name": "Sanne de Vries",
-            "employee_company_roles": [{"company_id": "c1"}, {"company_id": "c2"}],
-        },
-    ]))
+async def test_fetch_employees_filters_by_customer(settings):
+    respx.get("https://test.supabase.co/rest/v1/employees").mock(
+        return_value=httpx.Response(200, json=[
+            {
+                "id": "e1",
+                "first_name": "Sanne",
+                "infix": "de",
+                "last_name": "Vries",
+                "full_name": "Sanne de Vries",
+                "company_id": "c1",
+                "companies": {"customer_id": "1000435"},
+            },
+        ])
+    )
     out = await fetch_employees(settings, customer_id="1000435")
     assert len(out) == 1
     assert isinstance(out[0], EmployeeRecord)
     assert out[0].full_name == "Sanne de Vries"
-    assert set(out[0].company_ids) == {"c1", "c2"}
+    assert out[0].company_id == "c1"
+
+    request = respx.calls.last.request
+    qs = request.url.params
+    assert qs["companies.customer_id"] == "eq.1000435"
+    assert "company_id" not in qs.multi_items() or all(
+        k != "company_id" for k, _ in qs.multi_items()
+    )
+    assert "company_id" in qs["select"]
+    assert "companies!inner(customer_id)" in qs["select"]
 
 
 @respx.mock
@@ -74,13 +80,16 @@ async def test_fetch_employees_filters_by_company_id(settings):
     respx.get("https://test.supabase.co/rest/v1/employees").mock(
         return_value=httpx.Response(200, json=[
             {"id": "e1", "first_name": "A", "infix": None, "last_name": "X", "full_name": "A X",
-             "employee_company_roles": [{"company_id": "c1"}]},
-            {"id": "e2", "first_name": "B", "infix": None, "last_name": "Y", "full_name": "B Y",
-             "employee_company_roles": [{"company_id": "c2"}]},
+             "company_id": "c1", "companies": {"customer_id": "1000435"}},
         ])
     )
     out = await fetch_employees(settings, customer_id="1000435", company_id="c1")
     assert {e.id for e in out} == {"e1"}
+
+    request = respx.calls.last.request
+    qs = request.url.params
+    assert qs["companies.customer_id"] == "eq.1000435"
+    assert qs["company_id"] == "eq.c1"
 
 
 @respx.mock
