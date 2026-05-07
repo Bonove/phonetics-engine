@@ -105,6 +105,8 @@ def build_employee_index(
     for r in records:
         display = r.full_name
         canonical = r.full_name.lower()
+        if MatchField.FIRST_NAME in match_fields:
+            entries.append(_Entry(r.id, display, canonical, MatchField.FIRST_NAME, r.first_name))
         if MatchField.LAST_NAME in match_fields:
             entries.append(_Entry(r.id, display, canonical, MatchField.LAST_NAME, r.last_name))
             if r.infix and r.infix.strip():

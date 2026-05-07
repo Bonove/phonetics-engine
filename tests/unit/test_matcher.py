@@ -59,6 +59,26 @@ def test_employee_index_matches_last_name():
     assert out[0].matched_field in (MatchField.LAST_NAME, MatchField.LAST_NAME_WITH_INFIX)
 
 
+def test_employee_index_matches_first_name_when_opted_in():
+    idx = build_employee_index([
+        _employee("e1", "Tristan", "van", "Doorn"),
+        _employee("e2", "Steven", None, "Hünneman"),
+    ], match_fields=[MatchField.FIRST_NAME, MatchField.LAST_NAME, MatchField.FULL_NAME])
+    out = idx.search("Tristan", top_k=2)
+    assert out[0].id == "e1"
+    assert out[0].matched_field == MatchField.FIRST_NAME
+    assert out[0].matched_value == "Tristan"
+
+
+def test_employee_index_first_name_off_by_default():
+    idx = build_employee_index([
+        _employee("e1", "Tristan", "van", "Doorn"),
+    ], match_fields=[MatchField.LAST_NAME, MatchField.FULL_NAME])
+    out = idx.search("Tristan", top_k=2)
+    # No FIRST_NAME entry, "Tristan" only weakly resembles "Doorn"/"Tristan van Doorn"
+    assert all(c.matched_field != MatchField.FIRST_NAME for c in out)
+
+
 def test_employee_index_matches_infix_plus_last_name():
     idx = build_employee_index([
         _employee("e1", "Sanne", "de", "Vries"),
