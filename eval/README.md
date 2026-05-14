@@ -1,6 +1,46 @@
 # Phonetics Engine — Evaluation
 
-Scientific report on the offline evaluation harness for surname matching.  
+Report on the offline evaluation harness for surname matching.  
+- [1. Context](#1-context)
+- [2. System Architecture](#2-system-architecture)
+  - [Similarity pipeline](#similarity-pipeline)
+  - [Decision logic](#decision-logic)
+  - [Default thresholds (production)](#default-thresholds-production)
+- [3. Evaluation Design](#3-evaluation-design)
+  - [3.1 Why gold sets, not synthetic distortions](#31-why-gold-sets-not-synthetic-distortions)
+  - [3.2 Gold sets](#32-gold-sets)
+    - [`gold_dutch.csv` — Dutch (25 pairs)](#gold_dutchcsv--dutch-25-pairs)
+    - [`gold_french.csv` — French (25 pairs)](#gold_frenchcsv--french-25-pairs)
+  - [3.3 Background corpora](#33-background-corpora)
+  - [3.4 Negative control](#34-negative-control)
+  - [3.5 Metrics](#35-metrics)
+  - [3.6 Threshold sweep methodology](#36-threshold-sweep-methodology)
+- [4. Results](#4-results)
+  - [4.1 Current config — per-language breakdown](#41-current-config--per-language-breakdown)
+    - [Dutch — espeak `nl` — 223-name background](#dutch--espeak-nl--223-name-background)
+    - [French — espeak `fr-fr` — 307-name background](#french--espeak-fr-fr--307-name-background)
+    - [Combined](#combined)
+  - [4.2 Remaining miss patterns](#42-remaining-miss-patterns)
+  - [4.3 Threshold sweep](#43-threshold-sweep)
+  - [4.4 Pareto front (best Macro F1 at 0 OOV false positives)](#44-pareto-front-best-macro-f1-at-0-oov-false-positives)
+  - [4.5 Negative control](#45-negative-control)
+  - [4.6 Failure modes](#46-failure-modes)
+    - [Previously threshold-level, now resolved](#previously-threshold-level-now-resolved)
+    - [Model-level (require changes upstream of FAISS)](#model-level-require-changes-upstream-of-faiss)
+- [5. Levenshtein Baseline](#5-levenshtein-baseline)
+  - [5.1 Results](#51-results)
+  - [5.2 Per-language analysis](#52-per-language-analysis)
+  - [5.3 Latency trade-off](#53-latency-trade-off)
+  - [5.4 Interpretation](#54-interpretation)
+- [6. Vectorisation Experiment](#6-vectorisation-experiment)
+  - [Why phoneme unigrams produce more OOV false positives](#why-phoneme-unigrams-produce-more-oov-false-positives)
+  - [Why phoneme 2+3-grams (no unigrams) are worse than char 2+3-grams](#why-phoneme-23-grams-no-unigrams-are-worse-than-char-23-grams)
+  - [Next candidate](#next-candidate)
+- [7. Limitations](#7-limitations)
+- [8. Conclusion](#8-conclusion)
+- [9. Running the Evaluation](#9-running-the-evaluation)
+  - [Sweep output](#sweep-output)
+- [10. Files](#10-files)
 Last updated: May 2026.
 
 ---
@@ -344,14 +384,28 @@ an exact match. This is the exact use case the phoneme pipeline was designed for
 
 Levenshtein requires a full pairwise scan over the corpus: one comparison per candidate name
 per query. The phonetics engine vectorises the query once (a fixed IPA + n-gram step) and
-then uses FAISS for the corpus scan, with SIMD-vectorised inner product comparisons. For
-exact `IndexFlatIP` both are O(N), but with very different constant factors — and FAISS
-supports approximate nearest-neighbor indices (IVF, HNSW) that bring search to sub-linear
-time, an option not available to Levenshtein without structural pre-processing.
+then uses FAISS for the corpus scan, with SIMD-vectorised inner product comparisons.
 
-For small corpora (< 1,000 names) the latency difference is unlikely to be measurable.
-At production scale with tens of thousands of employees per tenant, the vectorised approach
-has a structural advantage. **This has not been benchmarked yet.**
+Benchmarked with 100 queries per corpus size against tiled Dutch surname corpora
+(`eval/benchmark.py`, p50 latency, macOS, espeak-ng pre-warmed):
+
+| Corpus size | Engine p50 (ms) | Levenshtein p50 (ms) | Speedup |
+|------------:|:-:|:-:|:-:|
+| 100 | 0.114 | 0.043 | 0.4× (Lev wins) |
+| 500 | 0.089 | 0.143 | 1.6× |
+| 1,000 | 0.074 | 0.236 | 3.2× |
+| 5,000 | 0.118 | 1.209 | 10.2× |
+| 10,000 | 0.177 | 2.428 | 13.7× |
+
+Below ~300 names Levenshtein has an edge because there is no index-build amortisation.
+Above that the FAISS query time stays roughly flat (~0.1 ms) while Levenshtein scales
+linearly (~0.24 µs per extra name). At 10,000 names the engine is **13.7× faster** per
+query (0.18 ms vs 2.43 ms). FAISS also supports approximate nearest-neighbor indices
+(IVF, HNSW) that would bring search to sub-linear time — an option not available to
+Levenshtein without structural pre-processing.
+
+However, given the low absolute times of the analysis with Levenshtein (2.5ms for 10k corpus), the latency
+hit might be totally irrelevant.
 
 ### 5.4 Interpretation
 
