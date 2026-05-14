@@ -38,9 +38,13 @@ Report on the offline evaluation harness for surname matching.
   - [Next candidate](#next-candidate)
 - [7. Limitations](#7-limitations)
 - [8. Conclusion](#8-conclusion)
-- [9. Running the Evaluation](#9-running-the-evaluation)
+- [9. Recommended Next Steps](#9-recommended-next-steps)
+  - [9.1 Strip IPA length mark before vectorisation](#91-strip-ipa-length-mark-before-vectorisation)
+  - [9.2 Expand the Dutch gold set](#92-expand-the-dutch-gold-set)
+  - [9.3 Consider a Dutch-specific Levenshtein fallback](#93-consider-a-dutch-specific-levenshtein-fallback)
+- [10. Running the Evaluation](#10-running-the-evaluation)
   - [Sweep output](#sweep-output)
-- [10. Files](#10-files)
+- [11. Files](#11-files)
 Last updated: May 2026.
 
 ---
@@ -511,6 +515,19 @@ Whether that is acceptable depends on the tenant: for a monolingual customer bas
 fine; for a multilingual one it is a risk. Raising `min_match` to 0.65 eliminates both OOV
 FPs at a cost of 3.5 pp Dutch F1 recall.
 
+**Should we use Levenshtein for Dutch?** Given that Dutch is the primary target language,
+the 29.6 pp F1 gap against Levenshtein is worth taking seriously. For Dutch the case for
+dropping to pure Levenshtein as a fallback — or as a parallel scorer — is strong: it
+handles the STT distortion patterns that dominate Dutch (shallow character substitutions,
+vowel-length spelling variants) with essentially no false positives. The main practical
+objection is latency, but at typical tenant corpus sizes (hundreds to low thousands of
+names) the difference is under 0.2 ms per query — negligible. The stronger objection is
+that Levenshtein is genuinely bad for French (68.4% F1) and would likely be equally poor
+for other phoneme-heavy languages (Arabic, Vietnamese, etc.). A hybrid approach — phoneme
+pipeline as primary, Levenshtein as Dutch-only re-ranking fallback — is worth investigating
+once the `ː` stripping and FAISS depth fixes are in, as those alone should close most of
+the Dutch gap without adding a separate scoring path.
+
 **The recalibration (done) was not a model improvement — it was fixing a configuration
 that had been making the model look worse than it is.** The underlying FAISS similarity
 scores were correct all along; `high_confidence=0.86` was simply blocking matches that
@@ -529,7 +546,55 @@ FAISS search depth — are both small, safe changes with well-understood upside.
 
 ---
 
-## 9. Running the Evaluation
+## 9. Recommended Next Steps
+
+### 9.1 Strip IPA length mark before vectorisation
+
+**Change:** one line in `src/phonetics_engine/phonetics.py`, `_phonemes_to_vector`:
+
+```python
+# before
+chars = phonemes.replace(" ", "")
+
+# after
+chars = phonemes.replace(" ", "").replace("\u02d0", "")  # strip IPA long-vowel mark ː
+```
+
+**Why:** espeak-ng encodes long vowels with `ː` (U+02D0). Currently `aː` and `a` generate
+different n-grams, so `Jansen` → `/jɑnsən/` and a long-vowel variant `/jɑːnsən/` land at
+different points in vector space. Stripping `ː` collapses them back to the same n-gram
+profile. The `vowel_length` category accounts for 5 of the 11 Dutch misses — this single
+change is expected to recover most of them.
+
+**Re-evaluate after applying:** the current Dutch gold set (`gold_dutch.csv`) already
+contains `vowel_length` pairs, so run `uv run python eval/evaluate.py` immediately after.
+Dutch F1 is expected to climb from 68.4% toward ~90%. If it does, re-run the threshold
+sweep to find a new Pareto-optimal config under the improved recall.
+
+### 9.2 Expand the Dutch gold set
+
+The current 25 Dutch pairs were AI-generated and are biased toward common surname
+patterns. After the `ː` fix lands, commission or hand-write a second Dutch gold set of
+50–100 pairs sourced from actual STT transcription errors on real Dutch names. Focus on:
+
+- Compound names (`van den Berg`, `de Graaf`)
+- Names with `ui`, `ou`, `ij` clusters — high STT error surface
+- Names where `g`/`ch`/`k` are commonly confused by ASR models
+
+This gives a more honest Dutch F1 number and will likely reveal a new failure category to
+target.
+
+### 9.3 Consider a Dutch-specific Levenshtein fallback
+
+If Dutch F1 after the `ː` fix and gold-set expansion still lags behind Levenshtein, a
+pragmatic option is a language-tagged fallback: use the phoneme engine as primary scorer
+and re-rank with Levenshtein when the tenant language is `nl`. This is a small code change
+with well-understood accuracy upside and negligible latency cost at typical Dutch tenant
+corpus sizes (see §5.3 — at 1,000 names the latency difference is 0.16 ms per query).
+
+---
+
+## 10. Running the Evaluation
 
 ```bash
 # Full gold evaluation at default thresholds
@@ -555,7 +620,7 @@ uv run python eval/evaluate.py --mode synthetic --sweep
 
 ---
 
-## 10. Files
+## 11. Files
 
 | File | Description |
 |---|---|
