@@ -1,3 +1,5 @@
+import zlib
+
 import espeakng_loader
 import faiss
 import numpy as np
@@ -62,7 +64,7 @@ def _phonemes_to_vector(phonemes: str, dim: int = 128) -> np.ndarray:
     for n in (2, 3):
         for i in range(len(chars) - n + 1):
             ngram = chars[i : i + n]
-            h = hash(ngram) % dim
+            h = zlib.crc32(ngram.encode()) % dim
             vec[h] += 1.0
     norm = np.linalg.norm(vec)
     if norm > 0:

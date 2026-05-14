@@ -482,7 +482,7 @@ def sweep_gold(gold_files: dict[str, Path]) -> None:
     MIN_MATCHES = [0.45, 0.50, 0.55, 0.60, 0.65, 0.70]
     HIGH_CONFS = [0.60, 0.65, 0.70, 0.75, 0.80, 0.86]
     MARGINS = [0.08, 0.10, 0.12, 0.15]
-    CURRENT_DEFAULT = (0.55, 0.86, 0.12)
+    CURRENT_DEFAULT = (0.60, 0.65, 0.08)
 
     # ------------------------------------------------------------------
     # 1. Build indices once; pre-fetch scored candidates for every query.

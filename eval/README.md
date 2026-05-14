@@ -56,9 +56,9 @@ with no close runner-up to trigger `AMBIGUOUS`. This is the dominant Dutch failu
 
 | Parameter | Value |
 |---|---|
-| `min_match` | 0.55 |
-| `high_confidence` | 0.86 |
-| `ambiguity_margin` | 0.12 |
+| `min_match` | 0.60 |
+| `high_confidence` | 0.65 |
+| `ambiguity_margin` | 0.08 |
 
 ---
 
@@ -169,11 +169,11 @@ Thresholds: `min=0.60  high=0.65  margin=0.08`
 | Category | Precision | Recall | F1 | TP | FP | FN |
 |---|---|---|---|---|---|---|
 | `cluster` | 100% | 75% | 86% | 3 | 0 | 1 |
-| `diphthong` | 100% | 100% | **100%** | 4 | 0 | 0 |
-| `other` | 100% | 80% | 89% | 4 | 0 | 1 |
+| `diphthong` | 100% | 75% | 86% | 3 | 0 | 1 |
+| `other` | 100% | 60% | 75% | 3 | 0 | 2 |
 | `voicing` | 100% | 57% | 73% | 4 | 0 | 3 |
 | `vowel_length` | 0% | 0% | **0%** | 0 | 1 | 4 |
-| **Overall** | **94%** | **62%** | **75.0%** | 15 | 1 | 9 |
+| **Overall** | **93%** | **54%** | **68.4%** | 13 | 1 | 11 |
 
 #### French — espeak `fr-fr` — 307-name background
 
@@ -191,89 +191,114 @@ Thresholds: `min=0.60  high=0.65  margin=0.08`
 | Config | Dutch F1 | French F1 | Macro F1 | Generalizability |
 |---|---|---|---|---|
 | Previous default (0.55/0.86/0.12) | 48.5% | 86.4% | 67.4% | 0.56 — SIGNIFICANT BIAS |
-| **Current config (0.60/0.65/0.08)** | **75.0%** | **88.9%** | **81.9%** | **0.84 — MILD BIAS** |
+| **Current config (0.60/0.65/0.08)** | **68.4%** | **88.9%** | **78.7%** | **0.77 — MILD BIAS** |
 
 ### 4.2 Remaining miss patterns
 
-With the previous default, the dominant failure was the **dead zone**: the model found the
+With the previous default the dominant failure was the **dead zone**: the model found the
 correct name at raw similarity 0.60–0.85, but `high_confidence=0.86` blocked the match.
-Lowering `high_confidence` to 0.65 resolved all of those cases.
+Lowering `high_confidence` to 0.65 resolved those cases. The current misses split into two
+groups.
 
-The current misses are of a different nature — the model's raw similarity score is genuinely
-below `min_match=0.60`, meaning edit-distance between the IPA vectors is too large to recover:
+**Model-level misses** — raw cosine similarity genuinely below `min_match=0.60`:
 
 | Query | Want | Raw score | Reason |
 |---|---|---|---|
-| Mas | Maas | 0.000 | vowel-length diacritic (`ː`) treated as literal char |
-| Ber | Beer | 0.000 | vowel-length diacritic |
-| Bon | Boon | 0.000 | vowel-length diacritic |
-| Fos | Vos | 0.258 | short name — few n-grams, substitution dominates |
-| Fermeer | Vermeer | 0.273 | initial v→f, short overlap |
-| Anri | Henry | 0.000 | French silent h + nasal vowel collapse |
+| Fos | Vos | 0.333 | initial v→f substitution |
+| Fermeer | Vermeer | 0.455 | initial v→f substitution |
+| Multer | Mulder | 0.503 | word-final d→t devoicing |
+| Mas | Maas | 0.000 | `ː` treated as literal char — `maːs` vs `mɑs` share no n-grams |
+| Lan | Laan | 0.000 | same cause; wrong match returned (Roeland) — FP |
+| Ber | Beer | 0.000 | same cause |
+| Ven | Veen | 0.000 | same cause |
+| Bon | Boon | 0.000 | same cause |
+| Klein | Kleijn | 0.503 | ij→i diphthong simplification |
+| Jon | Jong | 0.333 | final ng→n nasal drop |
+| Smets | Smeets | 0.252 | vowel shift |
+| Russo | Rousseau | 0.200 | eau→o + ou→u, both collapsed |
+| Vanson | Vincent | 0.251 | in→on nasal restructuring + silent t |
+| Anri | Henry | 0.000 | silent h + nasal vowel collapse |
 | Ru | Roux | 0.000 | near-total phoneme deletion |
+| Rober | Robert | 0.507 | silent final t |
 
-These are not threshold problems. No value of `high_confidence` can fix a raw similarity of
-0.0. The fix is upstream: normalise the IPA representation before n-gram extraction (see §6).
+No threshold adjustment can recover a raw score of 0.0. The root fix for the `vowel_length`
+category is to strip `ː` from the IPA string before n-gram extraction (see §7).
+
+**TOP-K dead zones** — raw similarity above `min_match` but the correct name ranks outside
+the top-5 FAISS results:
+
+| Query | Want | Raw score | Notes |
+|---|---|---|---|
+| Plom | Blom | 0.600 | scores at threshold but ranks > 5th |
+
+These would be recovered by increasing the FAISS search depth at query time, with no model
+or threshold changes needed.
 
 ### 4.3 Threshold sweep
 
 Selected rows from the full sweep (run: `uv run python eval/evaluate.py --sweep`).
-Note: the sweep uses pre-cached top-K candidates, so sweep F1 figures are slightly lower
-than the full evaluation above, which fetches all candidates.
+Note: sweep F1 figures use TOP_K=5 candidates; the full evaluation figure may be higher.
 
 | min | high | margin | DU F1 | FR F1 | Macro F1 | Gen | Neg FP |
 |---|---|---|---|---|---|---|---|
-| 0.45 | 0.60 | 0.08 | 75.0% | 91.3% | 83.2% | 0.82 | 45.0% |
-| 0.50 | 0.65 | 0.08 | 75.0% | 91.3% | 83.2% | 0.82 | 27.5% |
-| **0.60** | **0.65** | **0.08** | **71.8%** | **88.9%** | **80.3%** | **0.81** | **0.0%** ← current |
-| 0.65 | 0.70 | 0.12 | 64.9% | 86.4% | 75.7% | 0.75 | 0.0% |
-| 0.55 | 0.86 | 0.12 | 48.5% | 86.4% | 67.4% | 0.56 | 12.5% |
+| 0.45 | 0.60 | 0.10 | 81.0% | 91.3% | 86.1% | 0.89 | 40.0% |
+| 0.50 | 0.60 | 0.08 | 75.0% | 91.3% | 83.2% | 0.82 | 30.0% |
+| **0.60** | **0.65** | **0.08** | **68.4%** | **88.9%** | **78.7%** | **0.77** | **5.0%** | ← current (rank 47/120) |
+| 0.65 | 0.70 | 0.08 | 64.9% | 88.9% | 76.9% | 0.73 | 0.0% | ← Pareto at 0% OOV FP |
+| 0.55 | 0.86 | 0.12 | 48.5% | 86.4% | 67.4% | 0.56 | 12.5% | (previous default) |
 
-The previous production default (0.55/0.86/0.12) ranked **107 / 120** in the sweep.
+The previous production default (0.55/0.86/0.12) ranked **last** in the sweep.
 
 ### 4.4 Pareto front (best Macro F1 at 0 OOV false positives)
 
 | Precision floor | Config | Macro F1 (sweep) | DU F1 | FR F1 |
 |---|---|---|---|---|
-| ≥ 70% | **0.60 / 0.65 / 0.08** | **80.3%** | 71.8% | 88.9% |
-| ≥ 80% | **0.60 / 0.65 / 0.08** | **80.3%** | 71.8% | 88.9% |
-| ≥ 90% | **0.60 / 0.65 / 0.08** | **80.3%** | 71.8% | 88.9% |
-| 100% | **0.60 / 0.65 / 0.08** | **80.3%** | 71.8% | 88.9% |
+| ≥ 70% | **0.65 / 0.70 / 0.08** | **76.9%** | 64.9% | 88.9% |
+| ≥ 80% | **0.65 / 0.70 / 0.08** | **76.9%** | 64.9% | 88.9% |
+| ≥ 90% | (no config meets this constraint with 0 neg FPs) | | | |
+| 100% | (no config meets this constraint with 0 neg FPs) | | | |
 
-The same config is Pareto-optimal at every precision constraint simultaneously, and is now
-the active configuration.
+The active config (0.60/0.65/0.08) trades a 1.8 pp Macro F1 advantage over the strict
+Pareto-optimal for higher Dutch recall, accepting 2 OOV false positives.
 
 ### 4.5 Negative control
 
-At the current config (min=0.60), all 20 OOV names are correctly rejected by both language
-indices. The previous default had 5 false positives on the French index (English names
-phonemised by `fr-fr` accidentally matching French background names near the 0.55 floor).
-Raising `min_match` to 0.60 eliminated all of them.
+At the current config (min=0.60) there are **2 OOV false positives** across both indices
+(5.0% of 20 OOV names × 2 language indices):
+
+| OOV name | Index | Matched | Score |
+|---|---|---|---|
+| Roosevelt | Dutch | Veld | 0.651 |
+| Jefferson | French | Levy | 0.601 |
+
+The Pareto-optimal config (0.65/0.70/0.08) eliminates both.
+The previous default had 5 OOV FPs on the French index (12.5%) at the lower 0.55 floor.
 
 ### 4.6 Failure modes
 
 #### Previously threshold-level, now resolved
 
 Dutch `voicing`, `cluster`, and `diphthong` patterns had raw similarities of 0.60–0.85, which
-were blocked by `high_confidence=0.86`. Lowering `high_confidence` to 0.65 recovered all of
-them (+26.5 pp Dutch F1 overall).
+were blocked by `high_confidence=0.86`. Lowering `high_confidence` to 0.65 recovered most of
+them (+19.9 pp Dutch F1).
 
 #### Model-level (require changes upstream of FAISS)
 
-**Dutch vowel length — 0% recall, raw ≈ 0.0**  
+**Dutch vowel length — 0% recall, raw = 0.000**  
 espeak-ng uses `ː` for long vowels: `maːs` (Maas) vs `mɑs` (Mas). The character n-gram
 extractor treats `ː` as a literal character, so long and short vowel strings share almost no
-tokens. No threshold can fix a raw score of 0.0.  
-Fix: strip `ː` before n-gram extraction (see §6).
+n-grams. No threshold can fix a raw score of 0.000.  
+Fix: strip `ː` before n-gram extraction (see §7).
 
 **French phoneme collapses**  
-`Vincent/Vanson` (raw=0.22) and `Henry/Anri` (raw=0.00) involve nasal vowel restructuring and
-silent-consonant removal that changes the IPA string substantially. `Roux/Ru` (raw=0.00) is
-a near-total deletion. These are genuine model-level boundaries.
+`Vincent/Vanson` (raw=0.333) and `Henry/Anri` (raw=0.172) involve nasal vowel restructuring
+and silent-consonant removal. `Roux/Ru` (raw=0.000) is a near-total deletion. These are
+genuine model-level boundaries not addressable by threshold tuning.
 
-**Short-name instability**  
-Short queries like `Fos` (3 chars) and `Ber` (3 chars) produce very few n-grams, making the
-cosine similarity sensitive to single-character differences in a way that longer names are not.
+**TOP-K retrieval depth**  
+`Schouten/Skouten` (raw=0.636) and `Blom/Plom` (raw=0.600) score above `min_match` but rank
+outside the TOP-5 candidates. Increasing the FAISS search depth for the classify step would
+recover both without any threshold or model changes.
 
 ---
 
@@ -295,23 +320,25 @@ Pareto-optimal threshold per approach (0% OOV false positives required):
 
 | System | Config | Dutch F1 | French F1 | Macro F1 | OOV FP |
 |---|---|---|---|---|---|
-| Levenshtein (baseline) | threshold=0.67 | 98.0% | 68.4% | **83.2%** | 0% |
+| Levenshtein (baseline) | threshold=0.67 | 98.0% | 68.4% | 83.2% | 0% |
 | Phonetics engine (previous default) | 0.55/0.86/0.12 | 48.5% | 86.4% | 67.4% | 12.5% |
-| Phonetics engine (current config) | 0.60/0.65/0.08 | 75.0% | 88.9% | **81.9%** | 0% |
+| Phonetics engine (current) | 0.60/0.65/0.08 | 68.4% | 88.9% | 78.7% | 5.0% |
+| Phonetics engine (Pareto 0% OOV) | 0.65/0.70/0.08 | 64.9% | 88.9% | 76.9% | 0% |
 
 ### 5.2 Per-language analysis
 
-**Dutch**: Levenshtein is superior (98.0% vs 75.0%). Dutch STT distortions are predominantly
-1–2 character substitutions (`Fisser/Visser`, `Smeets/Smets`, `Timerman/Timmerman`). At this
-scale, edit distance captures the signal directly without needing phoneme-level representation.
-The phonetics engine's n-gram vector approach is more powerful but requires correct threshold
-calibration to close the gap — at the previous default it was being blocked at the gate.
+**Dutch**: Levenshtein is strongly superior on Dutch (98.0% vs 68.4%). Dutch STT distortions
+are predominantly 1–2 character substitutions (`Fisser/Visser`, `Smeets/Smets`). Edit
+distance captures this directly. The remaining Dutch gap for the phonetics engine is partly
+the `vowel_length` category (0% recall, a model-level issue solvable with IPA normalisation,
+see §7) and partly `voicing` cases where single-character substitutions are insufficiently
+discriminative in a 128-dim hashed character n-gram space.
 
-**French**: The phonetics engine is superior (88.9% vs 68.4%). French spelling and
-pronunciation are divergent: `Chevalier` and `Shevalier` differ by 2 characters but are
-phonerically near-identical. Edit distance penalises this heavily. The `fr-fr` espeak-ng
-backend maps both to the same IPA, making them essentially an exact match. This is the
-exact use case the phoneme pipeline was designed for.
+**French**: The phonetics engine is strongly superior (88.9% F1 vs 68.4% F1 for
+Levenshtein). French spelling and pronunciation are divergent: `Chevalier` and `Shevalier`
+differ by 2 characters but are phonetically near-identical. Edit distance penalises this
+heavily. The `fr-fr` espeak-ng backend maps both to the same IPA, making them essentially
+an exact match. This is the exact use case the phoneme pipeline was designed for.
 
 ### 5.3 Latency trade-off
 
@@ -328,59 +355,127 @@ has a structural advantage. **This has not been benchmarked yet.**
 
 ### 5.4 Interpretation
 
-The Levenshtein comparison reveals that the phonetics engine's weaker Dutch performance at
-the previous default was not primarily a model problem — it was a calibration problem.
-The underlying similarity scores were already good (confirmed by the dead-zone analysis in
-§4.2). A simple edit-distance approach with a well-chosen threshold outperformed the
-uncalibrated engine on Dutch.
-
-After recalibration, the engine is within 2 Macro F1 percentage points of the Levenshtein
-baseline overall (81.9% vs 83.2%), while significantly outperforming it on French
-(88.9% vs 68.4%) — which is where the phoneme pipeline earns its keep.
+The phonetics engine currently trails the Levenshtein baseline on Macro F1 (78.7% vs 83.2%
+at current config; 76.9% vs 83.2% at 0% OOV FP). This aggregate figure masks opposite
+trends: the engine is substantially worse on Dutch (−29.6 pp F1) and substantially better
+on French (+20.5 pp F1). The phoneme pipeline is doing exactly what it was designed for on
+French; the Dutch gap is concentrated in `vowel_length` and one TOP-K retrieval case —
+both tractable issues (see §7).
 
 ---
 
-## 6. Recommendations
+## 6. Vectorisation Experiment
 
-### ✅ Done — threshold recalibration
+The default vectoriser extracts character 2-grams and 3-grams from the IPA string after
+stripping spaces (`"v ɪ s ə r"` → `"vɪsər"` → bigrams `vɪ`, `ɪs`, `sə`, `ər`;
+trigrams `vɪs`, `ɪsə`, `sər`). Three strategies were evaluated at the same threshold
+config (0.60/0.65/0.08):
 
-The Pareto-optimal configuration is now the active default (`config.py`):
+| Vectoriser | Dutch F1 | French F1 | Macro F1 | OOV FP |
+|---|---|---|---|---|
+| **Char n-grams (2,3) — current** | **68.4%** | **88.9%** | **78.7%** | **5.0%** |
+| Phoneme n-grams (1,2,3) — with unigrams | 78.0% | 91.3% | 84.7% | ❌ worse |
+| Phoneme n-grams (2,3) — no unigrams | 64.9% | 86.4% | 75.6% | 0% |
 
-```python
-phx_employee_min_match: float = 0.60        # was 0.55
-phx_employee_high_confidence: float = 0.65  # was 0.86 — the critical change
-phx_employee_ambiguity_margin: float = 0.08 # was 0.12
-```
+### Why phoneme unigrams produce more OOV false positives
 
-Actual measured impact:
+Adding phoneme unigrams (`r`, `n`, `l`, `m`, `s`, …) improves gold recall but makes OOV
+names match too easily: common individual phonemes appear in both English OOV names
+(`Fernandez`, `Hamilton`) and Dutch/French background names. At threshold 0.60/0.65,
+Fernandez scores 0.700 against a Dutch background name — above `high_confidence`. Raising
+the threshold to eliminate these OOV FPs creates a new dead zone that depresses Dutch F1
+back below the char n-gram baseline.
 
-| Metric | Previous default | Current config | Delta |
-|---|---|---|---|
-| Dutch F1 | 48.5% | 75.0% | **+26.5 pp** |
-| French F1 | 86.4% | 88.9% | +2.5 pp |
-| Macro F1 | 67.4% | 81.9% | **+14.5 pp** |
-| OOV false positives | 12.5% | 0% | **−12.5 pp** |
+### Why phoneme 2+3-grams (no unigrams) are worse than char 2+3-grams
 
-This was a strict improvement on every metric simultaneously.
+Surnames are short (4–8 phoneme tokens). A 5-token name produces only 4 bigrams + 3
+trigrams = 7 features. The vector is sparse, and cosine similarity scores drop below
+`min_match` for valid pairs. The character n-gram approach extracts bigram/trigram patterns
+at sub-phoneme resolution (IPA uses single Unicode characters per phoneme), giving denser
+and more discriminative vectors for this name-length distribution.
 
-### Next — IPA normalisation (one function, high impact)
+### Next candidate
 
-Apply a normalisation pass in `phonetics.py` before n-gram extraction:
-
-```python
-def normalise_ipa(phonemes: str) -> str:
-    phonemes = phonemes.replace("ː", "")          # long vowel → same token as short
-    for nasal in ("ɑ̃", "ɛ̃", "œ̃", "ɔ̃"):
-        phonemes = phonemes.replace(nasal, "N")   # French nasals → canonical token
-    return phonemes
-```
-
-Expected impact: Dutch `vowel_length` recovers from 0%; French `nasal` improves further. No
-changes needed to the matching or decision logic.
+Increase the hash dimension (128 → 256 or 512) before retrying phoneme n-grams. A larger
+dimension reduces hash collisions and might give phoneme unigrams sufficient separation to
+avoid OOV FPs without requiring a higher `min_match` threshold.
 
 ---
 
-## 7. Running the Evaluation
+## 7. Limitations
+
+**Gold sets are AI-generated.** The (original, STT-variant) pairs were constructed by
+prompting an LLM to generate plausible phonological distortions for each category, then
+manually reviewed for plausibility. They represent hypothesized distortion patterns, not
+transcripts from a real STT system on real callers. A system that looks good here could
+still fail on distortions that weren't anticipated.
+
+**25 pairs per language is a small sample.** Category-level F1 scores are computed over
+3–7 pairs. A single pair flipping from miss to hit moves the category score by 14–33 pp.
+The numbers should be read as directional signals, not precise estimates.
+
+**Background corpora are generic, not tenant-specific.** The Dutch (223 names) and French
+(307 names) background corpora are generic surname lists. Real tenants may have employee
+databases with thousands of names, different surname distributions, or names from languages
+other than the index language — all of which will affect both recall and OOV false
+positive rates in ways this evaluation does not capture.
+
+**OOV negative control is narrow.** The 20 OOV names are predominantly English and
+Eastern European. A multilingual tenant with Arabic, Chinese, or Turkish names in their
+database would present a very different OOV challenge.
+
+---
+
+## 8. Conclusion
+
+**The approach works, but the two languages have fundamentally different failure profiles.**
+
+For French, the phoneme pipeline is clearly the right tool. French orthography and
+pronunciation are so divergent that character-level edit distance is nearly useless
+(`Chevalier/Shevalier` differ by two chars but are phonetically identical — Levenshtein
+penalises that heavily, the engine does not). The engine reaches 88.9% F1 on the French
+gold set; the Levenshtein baseline reaches 68.4% F1. The remaining 4 French misses are
+genuine phoneme collapses (`Roux/Ru`, `Henry/Anri`) where the IPA strings are simply too
+different after the distortion — no realistic threshold change will recover them.
+
+For Dutch, the picture is messier. The engine reaches 68.4% F1 on the Dutch gold set; the
+Levenshtein baseline reaches 98.0% F1. That gap tells you that most Dutch STT distortions
+are shallow character substitutions that edit distance handles trivially. The gap is not
+random: 5 of the 11 Dutch misses come from one specific category (`vowel_length`) that
+fails completely because espeak-ng encodes long vowels with `ː` and our n-gram extractor
+treats that as a literal character. One more miss is a retrieval artefact — the correct
+name has a cosine similarity above threshold but ranks outside the top-5 FAISS results. Fix
+those two things and Dutch F1 climbs from 68.4% to roughly 90%. The remaining 5 Dutch
+misses are genuinely hard cases (initial consonant substitutions like `Fos/Vos` where the
+phoneme strings are just different enough to fall below threshold).
+
+**False positives in production.** At the current config (min=0.60), there are **2 OOV
+false positives** across both indices (5.0%): Roosevelt on the Dutch index (cosine
+similarity 0.651 against Veld) and Jefferson on the French index (0.601 against Levy). In
+practice this means a truly foreign name will very occasionally return a confident match.
+Whether that is acceptable depends on the tenant: for a monolingual customer base it is
+fine; for a multilingual one it is a risk. Raising `min_match` to 0.65 eliminates both OOV
+FPs at a cost of 3.5 pp Dutch F1 recall.
+
+**The recalibration (done) was not a model improvement — it was fixing a configuration
+that had been making the model look worse than it is.** The underlying FAISS similarity
+scores were correct all along; `high_confidence=0.86` was simply blocking matches that
+scored 0.60–0.85, which is most of the useful signal. That is fixed. The two remaining
+high-impact improvements — stripping `ː` from IPA before extraction, and increasing the
+FAISS search depth — are both small, safe changes with well-understood upside.
+
+| Language | System | Precision | Recall | F1 |
+|---|---|---|---|---|
+| Dutch | Levenshtein (0.67) | 100% | 96% | 98.0% |
+| Dutch | Engine (0.60/0.65/0.08) | 93% | 54% | 68.4% |
+| French | Levenshtein (0.67) | 93% | 54% | 68.4% |
+| French | Engine (0.60/0.65/0.08) | 100% | 80% | 88.9% |
+| **Macro F1** | Levenshtein | | | **83.2%** |
+| **Macro F1** | Engine | | | **78.7%** |
+
+---
+
+## 9. Running the Evaluation
 
 ```bash
 # Full gold evaluation at default thresholds
@@ -406,7 +501,7 @@ uv run python eval/evaluate.py --mode synthetic --sweep
 
 ---
 
-## 8. Files
+## 10. Files
 
 | File | Description |
 |---|---|
