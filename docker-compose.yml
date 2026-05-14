@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: phonetics
+    volumes:
+      - ./migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
+      - ./migrations/002_company_id_on_employees.sql:/docker-entrypoint-initdb.d/002_company_id_on_employees.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgrest:
+    image: postgrest/postgrest:v12.2.0
+    environment:
+      PGRST_DB_URI: postgres://postgres:postgres@db:5432/phonetics
+      PGRST_DB_SCHEMA: public
+      # No PGRST_JWT_SECRET = JWT auth disabled, all requests run as anon role
+      PGRST_DB_ANON_ROLE: postgres
+      PGRST_OPENAPI_MODE: ignore-privileges
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy

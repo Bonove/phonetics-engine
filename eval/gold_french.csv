@@ -1,0 +1,26 @@
+original,query,category,note
+Dupont,Dupon,final_silent,silent final t (extremely common)
+Robert,Rober,final_silent,silent final t
+Lefort,Lefor,final_silent,silent final t
+Bernard,Bernar,final_silent,silent final d
+Blanc,Blan,final_silent,silent final c
+Petit,Peti,final_silent,silent final t
+Moreau,Moro,eau_o,eau→o simplification
+Rousseau,Russo,eau_o,eau→o + ou→u
+Beaulieu,Bolieu,eau_o,beau→bo (eau→o)
+Chevalier,Shevalier,ch_sh,ch→sh (French ch sounds like sh)
+Blanchard,Blanshar,ch_sh,ch→sh + silent d
+Michel,Mishel,ch_sh,ch→sh
+Richard,Rishar,ch_sh,ch→sh + silent d
+Martin,Marten,nasal,nasal vowel in→en
+Laurent,Loran,nasal,nasal vowel + silent t
+Vincent,Vanson,nasal,in→on nasal + silent t
+Fontaine,Fonten,nasal,ai→e + nasal simplification
+Philippe,Filipe,other,ph→f
+André,Andre,other,accent drop (extremely common in STT)
+Gauthier,Gotier,other,au→o + silent h
+Henry,Anri,other,silent h + en→an
+Girard,Jirar,other,soft g→j + silent d
+Roux,Ru,other,silent x + ou→u
+Dubois,Dubwa,other,oi→wa diphthong
+Clément,Clement,other,accent drop + nasal simplification

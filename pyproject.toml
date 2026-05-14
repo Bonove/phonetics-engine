@@ -45,3 +45,8 @@ select = ["E", "F", "I", "B", "UP", "ASYNC"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["phonetics_engine"]
+
+[dependency-groups]
+dev = [
+    "rapidfuzz>=3.14.5",
+]

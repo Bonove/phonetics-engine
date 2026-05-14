@@ -19,15 +19,16 @@ class _Entry:
 
 
 class TenantIndex:
-    def __init__(self, entries: list[_Entry], dim: int = 128):
+    def __init__(self, entries: list[_Entry], dim: int = 128, language: str = "nl"):
         self._entries = entries
         self._dim = dim
+        self._language = language
         self._index: faiss.Index | None = None
 
         if not entries:
             return
 
-        phonemes = phonemize_batch([e.matched_value for e in entries])
+        phonemes = phonemize_batch([e.matched_value for e in entries], language=language)
         vectors = np.array(
             [_phonemes_to_vector(p, dim) for p in phonemes],
             dtype=np.float32,
@@ -39,7 +40,7 @@ class TenantIndex:
         if not self._index or not self._entries:
             return []
 
-        qp = phonemize_name(query)
+        qp = phonemize_name(query, language=self._language)
         if not qp:
             return []
         qv = _phonemes_to_vector(qp, self._dim).reshape(1, -1)
@@ -70,7 +71,7 @@ class TenantIndex:
 
 
 def build_company_index(
-    records: list[CompanyRecord], *, match_fields: list[MatchField]
+    records: list[CompanyRecord], *, match_fields: list[MatchField], language: str = "nl"
 ) -> TenantIndex:
     entries: list[_Entry] = []
     for r in records:
@@ -95,11 +96,11 @@ def build_company_index(
                 entries.append(
                     _Entry(r.id, r.display_name, r.canonical_name, MatchField.ALIAS, alias)
                 )
-    return TenantIndex(entries)
+    return TenantIndex(entries, language=language)
 
 
 def build_employee_index(
-    records: list[EmployeeRecord], *, match_fields: list[MatchField]
+    records: list[EmployeeRecord], *, match_fields: list[MatchField], language: str = "nl"
 ) -> TenantIndex:
     entries: list[_Entry] = []
     for r in records:
@@ -116,4 +117,4 @@ def build_employee_index(
                 )
         if MatchField.FULL_NAME in match_fields:
             entries.append(_Entry(r.id, display, canonical, MatchField.FULL_NAME, r.full_name))
-    return TenantIndex(entries)
+    return TenantIndex(entries, language=language)

@@ -16,20 +16,20 @@ SIMILARITY_THRESHOLD = 0.0  # we filter at decision-layer with thresholds; keep 
 _SEPARATOR = Separator(phone=" ", word="", syllable="")
 
 
-def phonemize_name(name: str) -> str:
+def phonemize_name(name: str, language: str = PHONEMIZER_LANGUAGE) -> str:
     if not name or not name.strip():
         return ""
     result = phonemize(
         name.strip(),
         backend=PHONEMIZER_BACKEND,
-        language=PHONEMIZER_LANGUAGE,
+        language=language,
         separator=_SEPARATOR,
         strip=True,
     )
     return result.strip()
 
 
-def phonemize_batch(names: list[str]) -> list[str]:
+def phonemize_batch(names: list[str], language: str = PHONEMIZER_LANGUAGE) -> list[str]:
     cleaned = [n.strip() if n else "" for n in names]
     non_empty = [n for n in cleaned if n]
 
@@ -39,7 +39,7 @@ def phonemize_batch(names: list[str]) -> list[str]:
     results = phonemize(
         non_empty,
         backend=PHONEMIZER_BACKEND,
-        language=PHONEMIZER_LANGUAGE,
+        language=language,
         separator=_SEPARATOR,
         strip=True,
     )

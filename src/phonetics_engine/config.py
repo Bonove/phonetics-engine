@@ -13,9 +13,9 @@ class Settings(BaseSettings):
     phx_company_high_confidence: float = 0.82
     phx_company_ambiguity_margin: float = 0.10
 
-    phx_employee_min_match: float = 0.55
-    phx_employee_high_confidence: float = 0.86
-    phx_employee_ambiguity_margin: float = 0.12
+    phx_employee_min_match: float = 0.60
+    phx_employee_high_confidence: float = 0.65
+    phx_employee_ambiguity_margin: float = 0.08
 
     phx_cache_ttl_seconds: int = 60
     phx_top_k_default: int = 5

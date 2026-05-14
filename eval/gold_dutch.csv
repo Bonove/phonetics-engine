@@ -1,0 +1,26 @@
+original,query,category,note
+Visser,Fisser,voicing,initial v→f (very common in non-native Dutch STT)
+Vos,Fos,voicing,initial v→f
+Vermeer,Fermeer,voicing,initial v→f
+Bakker,Pakker,voicing,initial b→p
+Zegers,Segers,voicing,initial z→s
+Zijlstra,Sijlstra,voicing,initial z→s
+Mulder,Multer,voicing,word-final d→t devoicing
+Maas,Mas,vowel_length,aa→a long vowel drop
+Laan,Lan,vowel_length,aa→a long vowel drop
+Beer,Ber,vowel_length,ee→e long vowel drop
+Veen,Ven,vowel_length,ee→e long vowel drop
+Boon,Bon,vowel_length,oo→o long vowel drop
+Kleijn,Klein,diphthong,ij→i simplification
+Dijkstra,Dekstra,diphthong,ij→e + cluster simplification
+Kuipers,Kupers,diphthong,ui→u simplification
+Brouwer,Brauer,diphthong,ou→au (Dutch/German overlap)
+Schouten,Skouten,cluster,sch→sk
+Schuurman,Skuurman,cluster,sch→sk
+Jong,Jon,cluster,final ng→n nasal drop
+Achterberg,Akterberg,cluster,ch→k
+Timmerman,Timerman,other,double consonant drop
+Blom,Plom,other,initial b→p
+Wolters,Volters,other,initial w→v
+Hermans,Ermans,other,h-drop
+Smeets,Smets,other,ee→e vowel shift
